@@ -4,61 +4,66 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
+/// @title NFT Custody Service Contract
+/// @dev This contract allows users to deposit NFTs into custody and later claim them.
 contract NFTCustody is ERC721 {
-    // A user's ID mapped to their list of NFT tokenIds
+    /// @dev A mapping from a user's ID to their list of NFT tokenIds.
     mapping(string => uint256[]) private _ownedNFTs;
 
-    // Mapping from tokenId to the NFT contract address
+    /// @dev Mapping from tokenId to the NFT contract address.
     mapping(uint256 => address) private _nftContracts;
 
+    /// @notice Constructs the NFTCustody contract and initializes the token with name and symbol.
     constructor() ERC721("NFTCustody", "NFTC") {}
 
+    /// @notice Deposits an NFT into custody under a user's ID.
+    /// @dev Transfers the NFT from the caller's address to this contract.
+    /// @param userId The user ID to which the NFT will be associated.
+    /// @param tokenId The token ID of the NFT.
+    /// @param nftContractAddress The address of the NFT contract.
     function depositNFT(string memory userId, uint256 tokenId, address nftContractAddress) public {
-        // The NFT contract
         IERC721 nftContract = IERC721(nftContractAddress);
 
-        // Check that the NFT is approved for transfer to this contract
         require(nftContract.getApproved(tokenId) == address(this), "NFT must be approved for transfer");
 
-        // Transfer the NFT to this contract
         nftContract.transferFrom(msg.sender, address(this), tokenId);
 
-        // Record the deposit in the mappings
         _ownedNFTs[userId].push(tokenId);
         _nftContracts[tokenId] = nftContractAddress;
 
-        // Emit an event for the deposit
         emit NFTDeposited(userId, tokenId, nftContractAddress);
     }
 
+    /// @notice Claims all NFTs held in custody for a user ID.
+    /// @dev Transfers all NFTs associated with the user ID to a specified wallet.
+    /// @param userId The user ID whose NFTs are being claimed.
+    /// @param userWallet The wallet address to which the NFTs will be transferred.
     function claimNFT(string memory userId, address userWallet) public {
-        // Assuming a user can only claim all NFTs at once for simplicity
         require(_ownedNFTs[userId].length > 0, "User has no NFTs to claim");
 
-        // Transfer all NFTs to the userWallet
         for (uint i = 0; i < _ownedNFTs[userId].length; i++) {
             uint256 tokenId = _ownedNFTs[userId][i];
             address nftContractAddress = _nftContracts[tokenId];
-
-            // The NFT contract
             IERC721 nftContract = IERC721(nftContractAddress);
 
-            // Transfer the NFT to the user's wallet
             nftContract.transferFrom(address(this), userWallet, tokenId);
 
-            // Emit an event for the claim
             emit NFTClaimed(userId, tokenId, nftContractAddress, userWallet);
         }
 
-        // Reset the user's NFT list
         delete _ownedNFTs[userId];
     }
 
-    // Event to emit when an NFT is deposited
+    /// @dev Emitted when an NFT is deposited into custody.
+    /// @param userId The ID of the user who deposited the NFT.
+    /// @param tokenId The token ID of the deposited NFT.
+    /// @param nftContractAddress The contract address of the deposited NFT.
     event NFTDeposited(string indexed userId, uint256 indexed tokenId, address indexed nftContractAddress);
 
-    // Event to emit when an NFT is claimed
+    /// @dev Emitted when a user claims their NFTs from custody.
+    /// @param userId The ID of the user claiming the NFTs.
+    /// @param tokenId The token ID of the NFT being claimed.
+    /// @param nftContractAddress The contract address of the NFT being claimed.
+    /// @param userWallet The wallet address to which the NFTs are being transferred.
     event NFTClaimed(string indexed userId, uint256 indexed tokenId, address nftContractAddress, address indexed userWallet);
-
-    
 }
