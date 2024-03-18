@@ -28,7 +28,12 @@ contract NFTStorageAndTransfer is ReentrancyGuard {
     /// @param from The address from which the NFT is transferred.
     /// @param to The address to which the NFT is transferred.
     /// @param tokenId The token ID of the transferred NFT.
-    event NFTTransferred(address indexed nftContract, address indexed from, address indexed to, uint256 tokenId);
+    event NFTTransferred(
+        address indexed nftContract,
+        address indexed from,
+        address indexed to,
+        uint256 tokenId
+    );
 
     /// @notice Emitted when an email is linked to an address.
     /// @param email The email that is linked.
@@ -50,7 +55,10 @@ contract NFTStorageAndTransfer is ReentrancyGuard {
     /// @dev Can only be called by the owner of the contract.
     /// @param email The email to link.
     /// @param addr The address to link to the email.
-    function linkEmailToAddress(string memory email, address addr) public onlyOwner {
+    function linkEmailToAddress(
+        string memory email,
+        address addr
+    ) public onlyOwner {
         bytes32 emailHash = keccak256(abi.encodePacked(email));
         emailToAddress[emailHash] = addr;
         emit EmailLinked(email, addr);
@@ -61,9 +69,16 @@ contract NFTStorageAndTransfer is ReentrancyGuard {
     /// @param _nftContract The address of the NFT contract.
     /// @param _tokenId The token ID of the NFT.
     /// @param email The email against which the NFT will be stored.
-    function storeNFT(address _nftContract, uint256 _tokenId, string memory email) public nonReentrant {
+    function storeNFT(
+        address _nftContract,
+        uint256 _tokenId,
+        string memory email
+    ) public nonReentrant {
         bytes32 emailHash = keccak256(abi.encodePacked(email));
-        require(IERC721(_nftContract).ownerOf(_tokenId) == msg.sender, "Caller is not the owner");
+        require(
+            IERC721(_nftContract).ownerOf(_tokenId) == msg.sender,
+            "Caller is not the owner"
+        );
         IERC721(_nftContract).transferFrom(msg.sender, address(this), _tokenId);
 
         nftToEmailHash[_tokenId] = emailHash;
@@ -75,10 +90,20 @@ contract NFTStorageAndTransfer is ReentrancyGuard {
     /// @param _nftContract The address of the NFT contract.
     /// @param _tokenId The token ID of the NFT.
     /// @param recipientEmail The email associated with the stored NFT.
-    function claimStoredNFT(address _nftContract, uint256 _tokenId, string memory recipientEmail) public nonReentrant {
+    function claimStoredNFT(
+        address _nftContract,
+        uint256 _tokenId,
+        string memory recipientEmail
+    ) public nonReentrant {
         bytes32 emailHash = keccak256(abi.encodePacked(recipientEmail));
-        require(emailToAddress[emailHash] == msg.sender, "Email not linked to caller");
-        require(nftToEmailHash[_tokenId] == emailHash, "NFT not stored for this email");
+        require(
+            emailToAddress[emailHash] == msg.sender,
+            "Email not linked to caller"
+        );
+        require(
+            nftToEmailHash[_tokenId] == emailHash,
+            "NFT not stored for this email"
+        );
 
         IERC721(_nftContract).transferFrom(address(this), msg.sender, _tokenId);
         emit NFTTransferred(_nftContract, address(this), msg.sender, _tokenId);
@@ -92,12 +117,25 @@ contract NFTStorageAndTransfer is ReentrancyGuard {
     /// @param _nftContract The address of the NFT contract.
     /// @param recipientEmail The recipient's email linked to their address.
     /// @param _tokenId The token ID of the NFT.
-    function transferNFT(address _nftContract, string memory recipientEmail, uint256 _tokenId) public nonReentrant {
+    function transferNFT(
+        address _nftContract,
+        string memory recipientEmail,
+        uint256 _tokenId
+    ) public nonReentrant {
         bytes32 emailHash = keccak256(abi.encodePacked(recipientEmail));
         address recipientAddress = emailToAddress[emailHash];
         require(recipientAddress != address(0), "Recipient email not linked");
 
-        IERC721(_nftContract).transferFrom(msg.sender, recipientAddress, _tokenId);
-        emit NFTTransferred(_nftContract, msg.sender, recipientAddress, _tokenId);
+        IERC721(_nftContract).transferFrom(
+            msg.sender,
+            recipientAddress,
+            _tokenId
+        );
+        emit NFTTransferred(
+            _nftContract,
+            msg.sender,
+            recipientAddress,
+            _tokenId
+        );
     }
 }
