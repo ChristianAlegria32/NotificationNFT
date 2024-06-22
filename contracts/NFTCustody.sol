@@ -4,20 +4,22 @@ pragma solidity ^0.8.0;
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/utils/Base64.sol";
 
 /// @title NFT Custody Service Contract
 /// @dev This contract allows users to deposit NFTs into custody and later claim them.
 contract NFTCustody is ERC721, AccessControl {
-    /// @dev A mapping from a user's ID to their list of NFT tokenIds.
-
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     error CallerNotMinter(address caller);
 
     mapping(string => uint256[]) private _ownedNFTs;
-
-    /// @dev Mapping from tokenId to the NFT contract address.
     mapping(uint256 => address) private _nftContracts;
+    mapping(uint256 => string) private _positions;
+    mapping(uint256 => string) private _teams;
+    mapping(uint256 => uint256) private _scores;
+    mapping(uint256 => string) private _tokenURIs;
 
     /// @notice Constructs the NFTCustody contract and initializes the token with name and symbol.
     constructor(address minter) ERC721("NFTCustody", "NFTC") {
@@ -65,7 +67,18 @@ contract NFTCustody is ERC721, AccessControl {
     /// @dev Transfers all NFTs associated with the user ID to a specified wallet.
     /// @param userId The user ID whose NFTs are being claimed.
     /// @param userWallet The wallet address to which the NFTs will be transferred.
-    function claimNFT(string memory userId, address userWallet) public {
+    /// @param position The position of the user.
+    /// @param team The team of the user.
+    /// @param score The score of the user.
+    /// @param metadataURI The metadata URI of the NFT.
+    function claimNFT(
+        string memory userId,
+        address userWallet,
+        string memory position,
+        string memory team,
+        uint256 score,
+        string memory metadataURI
+    ) public {
         if (!hasRole(MINTER_ROLE, msg.sender)) {
             revert CallerNotMinter(msg.sender);
         }
@@ -77,12 +90,34 @@ contract NFTCustody is ERC721, AccessControl {
             address nftContractAddress = _nftContracts[tokenId];
             IERC721 nftContract = IERC721(nftContractAddress);
 
+            _positions[tokenId] = position;
+            _teams[tokenId] = team;
+            _scores[tokenId] = score;
+            _tokenURIs[tokenId] = metadataURI;
+
             nftContract.transferFrom(address(this), userWallet, tokenId);
 
-            emit NFTClaimed(userId, tokenId, nftContractAddress, userWallet);
+            emit NFTClaimed(userId, tokenId, nftContractAddress, userWallet, position, team, score, metadataURI);
         }
 
         delete _ownedNFTs[userId];
+    }
+
+    /// @notice Returns the metadata URI for a given token ID.
+    /// @param tokenId The ID of the token.
+    /// @return The metadata URI of the token.
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        string memory json = Base64.encode(bytes(string(abi.encodePacked(
+            '{"name": "NFT #', Strings.toString(tokenId), '",',
+            '"description": "An NFT from NFTCustody contract.",',
+            '"attributes": [',
+            '{"trait_type": "Position", "value": "', _positions[tokenId], '"},',
+            '{"trait_type": "Team", "value": "', _teams[tokenId], '"},',
+            '{"trait_type": "Score", "value": ', Strings.toString(_scores[tokenId]), '}',
+            '],',
+            '"image": "', _tokenURIs[tokenId], '"}'
+        ))));
+        return string(abi.encodePacked("data:application/json;base64,", json));
     }
 
     /// @dev Emitted when an NFT is deposited into custody.
@@ -100,10 +135,18 @@ contract NFTCustody is ERC721, AccessControl {
     /// @param tokenId The token ID of the NFT being claimed.
     /// @param nftContractAddress The contract address of the NFT being claimed.
     /// @param userWallet The wallet address to which the NFTs are being transferred.
+    /// @param position The position of the user.
+    /// @param team The team of the user.
+    /// @param score The score of the user.
+    /// @param tokenURI The metadata URI of the NFT.
     event NFTClaimed(
         string indexed userId,
         uint256 indexed tokenId,
         address nftContractAddress,
-        address indexed userWallet
+        address indexed userWallet,
+        string position,
+        string team,
+        uint256 score,
+        string tokenURI
     );
 }
