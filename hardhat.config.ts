@@ -11,8 +11,8 @@ const config: HardhatUserConfig = {
   solidity: "0.8.24",
   networks: {
     polygonAmoy: {
-      url: process.env.GOERLI_URL || "",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      url: process.env.POLYGONAMOY_URL || "",
+      accounts: process.env.PRIVATE_KEY && process.env.PRIVATE_KEY2 ? [process.env.PRIVATE_KEY, process.env.PRIVATE_KEY2] : [],
     },
   },
   etherscan:{
