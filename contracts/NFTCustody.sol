@@ -9,17 +9,23 @@ import "@openzeppelin/contracts/utils/Base64.sol";
 
 /// @title NFT Custody Service Contract
 /// @dev This contract allows users to deposit NFTs into custody and later claim them.
+import "hardhat/console.sol";
+
 contract NFTCustody is ERC721, AccessControl {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     error CallerNotMinter(address caller);
 
+    struct NFTMetadata {
+        address nftContractAddress;
+        string position;
+        string team;
+        uint256 score;
+        string tokenURI;
+    }
+
     mapping(string => uint256[]) private _ownedNFTs;
-    mapping(uint256 => address) private _nftContracts;
-    mapping(uint256 => string) private _positions;
-    mapping(uint256 => string) private _teams;
-    mapping(uint256 => uint256) private _scores;
-    mapping(uint256 => string) private _tokenURIs;
+    mapping(uint256 => NFTMetadata) private _nftMetadata;
 
     /// @notice Constructs the NFTCustody contract and initializes the token with name and symbol.
     constructor(address minter) ERC721("NFTCustody", "NFTC") {
@@ -58,7 +64,7 @@ contract NFTCustody is ERC721, AccessControl {
         nftContract.transferFrom(msg.sender, address(this), tokenId);
 
         _ownedNFTs[userId].push(tokenId);
-        _nftContracts[tokenId] = nftContractAddress;
+        _nftMetadata[tokenId].nftContractAddress = nftContractAddress;
 
         emit NFTDeposited(userId, tokenId, nftContractAddress);
     }
@@ -71,51 +77,58 @@ contract NFTCustody is ERC721, AccessControl {
     /// @param team The team of the user.
     /// @param score The score of the user.
     /// @param metadataURI The metadata URI of the NFT.
-    function claimNFT(
-        string memory userId,
-        address userWallet,
-        string memory position,
-        string memory team,
-        uint256 score,
-        string memory metadataURI
-    ) public {
-        if (!hasRole(MINTER_ROLE, msg.sender)) {
-            revert CallerNotMinter(msg.sender);
-        }
-
-        require(_ownedNFTs[userId].length > 0, "User has no NFTs to claim");
-
-        for (uint i = 0; i < _ownedNFTs[userId].length; i++) {
-            uint256 tokenId = _ownedNFTs[userId][i];
-            address nftContractAddress = _nftContracts[tokenId];
-            IERC721 nftContract = IERC721(nftContractAddress);
-
-            _positions[tokenId] = position;
-            _teams[tokenId] = team;
-            _scores[tokenId] = score;
-            _tokenURIs[tokenId] = metadataURI;
-
-            nftContract.transferFrom(address(this), userWallet, tokenId);
-
-            emit NFTClaimed(userId, tokenId, nftContractAddress, userWallet, position, team, score, metadataURI);
-        }
-
-        delete _ownedNFTs[userId];
+function claimNFT(
+    string memory userId,
+    address userWallet,
+    string memory position,
+    string memory team,
+    uint256 score,
+    string memory metadataURI
+) public {
+    if (!hasRole(MINTER_ROLE, msg.sender)) {
+        revert CallerNotMinter(msg.sender);
     }
+
+    require(_ownedNFTs[userId].length > 0, "User has no NFTs to claim");
+
+    for (uint i = 0; i < _ownedNFTs[userId].length; i++) {
+        uint256 tokenId = _ownedNFTs[userId][i];
+        IERC721 nftContract = IERC721(_nftMetadata[tokenId].nftContractAddress);
+
+        // Debugging logs
+        console.log("Position: ", position);
+        console.log("Team: ", team);
+        console.log("Score: ", score);
+        console.log("Metadata URI: ", metadataURI);
+
+        _nftMetadata[tokenId].position = position;
+        _nftMetadata[tokenId].team = team;
+        _nftMetadata[tokenId].score = score;
+        _nftMetadata[tokenId].tokenURI = metadataURI;
+
+        nftContract.transferFrom(address(this), userWallet, tokenId);
+
+        emit NFTClaimed(userId, tokenId, _nftMetadata[tokenId].nftContractAddress, userWallet, position, team, score, metadataURI);
+    }
+
+    delete _ownedNFTs[userId];
+}
+
 
     /// @notice Returns the metadata URI for a given token ID.
     /// @param tokenId The ID of the token.
     /// @return The metadata URI of the token.
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        NFTMetadata memory metadata = _nftMetadata[tokenId];
         string memory json = Base64.encode(bytes(string(abi.encodePacked(
             '{"name": "NFT #', Strings.toString(tokenId), '",',
             '"description": "An NFT from NFTCustody contract.",',
             '"attributes": [',
-            '{"trait_type": "Position", "value": "', _positions[tokenId], '"},',
-            '{"trait_type": "Team", "value": "', _teams[tokenId], '"},',
-            '{"trait_type": "Score", "value": ', Strings.toString(_scores[tokenId]), '}',
+            '{"trait_type": "Position", "value": "', metadata.position, '"},',
+            '{"trait_type": "Team", "value": "', metadata.team, '"},',
+            '{"trait_type": "Score", "value": ', Strings.toString(metadata.score), '}',
             '],',
-            '"image": "', _tokenURIs[tokenId], '"}'
+            '"image": "', metadata.tokenURI, '"}'
         ))));
         return string(abi.encodePacked("data:application/json;base64,", json));
     }
