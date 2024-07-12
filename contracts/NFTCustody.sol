@@ -21,7 +21,7 @@ contract NFTCustody is ERC721, AccessControl {
         string position;
         string team;
         uint256 score;
-        string tokenURI;
+        string imageURL;
     }
 
     mapping(string => uint256[]) private _ownedNFTs;
@@ -45,10 +45,18 @@ contract NFTCustody is ERC721, AccessControl {
     /// @param userId The user ID to which the NFT will be associated.
     /// @param tokenId The token ID of the NFT.
     /// @param nftContractAddress The address of the NFT contract.
+    /// @param position The position of the user.
+    /// @param team The team of the user.
+    /// @param score The score of the user.
+    /// @param imageURL The image URL of the NFT.
     function depositNFT(
         string memory userId,
         uint256 tokenId,
-        address nftContractAddress
+        address nftContractAddress,
+        string memory position,
+        string memory team,
+        uint256 score,
+        string memory imageURL
     ) public {
         IERC721 nftContract = IERC721(nftContractAddress);
 
@@ -63,8 +71,23 @@ contract NFTCustody is ERC721, AccessControl {
 
         nftContract.transferFrom(msg.sender, address(this), tokenId);
 
+        console.log("Storing Metadata:");
+        console.log("User ID:", userId);
+        console.log("Token ID:", tokenId);
+        console.log("Position:", position);
+        console.log("Team:", team);
+        console.log("Score:", score);
+        console.log("Image URL:", imageURL);
+
         _ownedNFTs[userId].push(tokenId);
-        _nftMetadata[tokenId].nftContractAddress = nftContractAddress;
+        _nftMetadata[tokenId] = NFTMetadata(nftContractAddress, position, team, score, imageURL);
+
+        // Verify metadata was stored correctly
+        console.log("Stored Metadata for Token ID:", tokenId);
+        console.log("Position:", _nftMetadata[tokenId].position);
+        console.log("Team:", _nftMetadata[tokenId].team);
+        console.log("Score:", _nftMetadata[tokenId].score);
+        console.log("Image URL:", _nftMetadata[tokenId].imageURL);
 
         emit NFTDeposited(userId, tokenId, nftContractAddress);
     }
@@ -73,53 +96,40 @@ contract NFTCustody is ERC721, AccessControl {
     /// @dev Transfers all NFTs associated with the user ID to a specified wallet.
     /// @param userId The user ID whose NFTs are being claimed.
     /// @param userWallet The wallet address to which the NFTs will be transferred.
-    /// @param position The position of the user.
-    /// @param team The team of the user.
-    /// @param score The score of the user.
-    /// @param metadataURI The metadata URI of the NFT.
-function claimNFT(
-    string memory userId,
-    address userWallet,
-    string memory position,
-    string memory team,
-    uint256 score,
-    string memory metadataURI
-) public {
-    if (!hasRole(MINTER_ROLE, msg.sender)) {
-        revert CallerNotMinter(msg.sender);
+    function claimNFT(
+        string memory userId,
+        address userWallet
+    ) public {
+        if (!hasRole(MINTER_ROLE, msg.sender)) {
+            revert CallerNotMinter(msg.sender);
+        }
+
+        require(_ownedNFTs[userId].length > 0, "User has no NFTs to claim");
+
+        for (uint i = 0; i < _ownedNFTs[userId].length; i++) {
+            uint256 tokenId = _ownedNFTs[userId][i];
+            IERC721 nftContract = IERC721(_nftMetadata[tokenId].nftContractAddress);
+
+            nftContract.transferFrom(address(this), userWallet, tokenId);
+
+            emit NFTClaimed(userId, tokenId, _nftMetadata[tokenId].nftContractAddress, userWallet, _nftMetadata[tokenId].position, _nftMetadata[tokenId].team, _nftMetadata[tokenId].score, _nftMetadata[tokenId].imageURL);
+        }
+
+        delete _ownedNFTs[userId];
     }
-
-    require(_ownedNFTs[userId].length > 0, "User has no NFTs to claim");
-
-    for (uint i = 0; i < _ownedNFTs[userId].length; i++) {
-        uint256 tokenId = _ownedNFTs[userId][i];
-        IERC721 nftContract = IERC721(_nftMetadata[tokenId].nftContractAddress);
-
-        // Debugging logs
-        console.log("Position: ", position);
-        console.log("Team: ", team);
-        console.log("Score: ", score);
-        console.log("Metadata URI: ", metadataURI);
-
-        _nftMetadata[tokenId].position = position;
-        _nftMetadata[tokenId].team = team;
-        _nftMetadata[tokenId].score = score;
-        _nftMetadata[tokenId].tokenURI = metadataURI;
-
-        nftContract.transferFrom(address(this), userWallet, tokenId);
-
-        emit NFTClaimed(userId, tokenId, _nftMetadata[tokenId].nftContractAddress, userWallet, position, team, score, metadataURI);
-    }
-
-    delete _ownedNFTs[userId];
-}
-
 
     /// @notice Returns the metadata URI for a given token ID.
     /// @param tokenId The ID of the token.
     /// @return The metadata URI of the token.
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         NFTMetadata memory metadata = _nftMetadata[tokenId];
+        
+        console.log("Retrieving Metadata for Token ID:", tokenId);
+        console.log("Position:", metadata.position);
+        console.log("Team:", metadata.team);
+        console.log("Score:", metadata.score);
+        console.log("Image URL:", metadata.imageURL);
+
         string memory json = Base64.encode(bytes(string(abi.encodePacked(
             '{"name": "NFT #', Strings.toString(tokenId), '",',
             '"description": "An NFT from NFTCustody contract.",',
@@ -128,7 +138,7 @@ function claimNFT(
             '{"trait_type": "Team", "value": "', metadata.team, '"},',
             '{"trait_type": "Score", "value": ', Strings.toString(metadata.score), '}',
             '],',
-            '"image": "', metadata.tokenURI, '"}'
+            '"image": "', metadata.imageURL, '"}'
         ))));
         return string(abi.encodePacked("data:application/json;base64,", json));
     }
@@ -147,11 +157,11 @@ function claimNFT(
     /// @param userId The ID of the user claiming the NFTs.
     /// @param tokenId The token ID of the NFT being claimed.
     /// @param nftContractAddress The contract address of the NFT being claimed.
-    /// @param userWallet The wallet address to which the NFTs are being transferred.
+    /// @param userWallet The wallet address to which the NFTs will be transferred.
     /// @param position The position of the user.
     /// @param team The team of the user.
     /// @param score The score of the user.
-    /// @param tokenURI The metadata URI of the NFT.
+    /// @param imageURL The metadata URI of the NFT.
     event NFTClaimed(
         string indexed userId,
         uint256 indexed tokenId,
@@ -160,6 +170,6 @@ function claimNFT(
         string position,
         string team,
         uint256 score,
-        string tokenURI
+        string imageURL
     );
 }

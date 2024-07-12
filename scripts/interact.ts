@@ -1,4 +1,5 @@
 import { ethers } from "hardhat";
+import { Buffer } from "buffer";
 
 async function main() {
     const signers = await ethers.getSigners();
@@ -12,7 +13,7 @@ async function main() {
     console.log("Interacting with contracts using the account:", deployer.address);
     console.log("User1 account:", user1.address);
 
-    const nftCustodyAddress = "0x752E8eE79eeD386d746BfaE53E201556bE0b0a17"; // Use your actual NFTCustody contract address
+    const nftCustodyAddress = "0xdC26577F40AC6eeBd2E5c2Fc7DB941b006Fbec07"; // Update this with your actual NFTCustody contract address
     const NFTCustody = await ethers.getContractAt("NFTCustody", nftCustodyAddress);
 
     console.log("NFTCustody contract fetched at address:", NFTCustody.address);
@@ -28,15 +29,25 @@ async function main() {
         await NFTCustody.connect(deployer).grantRole(MINTER_ROLE, user1.address, { gasLimit: 500000 });
         console.log("Granted MINTER_ROLE to user1");
 
-        // Mint an NFT and set metadata with manual gas limit
-        await NFTCustody.connect(user1).depositNFT("user1", 1, NFTCustody.address, { gasLimit: 500000 });
+        // Ensure the NFT is approved for transfer by the contract
+        const nftContract = await ethers.getContractAt("IERC721", nftCustodyAddress);
+        await nftContract.connect(user1).approve(NFTCustody.address, 1, { gasLimit: 500000 });
+        console.log("NFT approved for transfer");
+
+        // Deposit NFT and set metadata with manual gas limit
+        await NFTCustody.connect(user1).depositNFT("user1", 1, nftCustodyAddress, "Forward", "Example Team", 100, "https://example.com/1.png", { gasLimit: 500000 });
         console.log("NFT deposited");
 
-        await NFTCustody.connect(user1).claimNFT("user1", user1.address, "Forward", "Example Team", 100, "https://example.com/1.png", { gasLimit: 500000 });
+        await NFTCustody.connect(user1).claimNFT("user1", user1.address, { gasLimit: 500000 });
         console.log("NFT claimed");
 
         const tokenURI = await NFTCustody.tokenURI(1);
         console.log("Token URI: ", tokenURI);
+
+        // Decode base64
+        const base64Data = tokenURI.split(",")[1];
+        const jsonMetadata = Buffer.from(base64Data, 'base64').toString('utf8');
+        console.log("Decoded JSON Metadata: ", jsonMetadata);
     } catch (error) {
         console.error("Error during interaction:", error);
     }
