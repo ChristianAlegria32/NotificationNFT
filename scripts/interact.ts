@@ -13,47 +13,55 @@ async function main() {
     console.log("Interacting with contracts using the account:", deployer.address);
     console.log("User1 account:", user1.address);
 
-    const nftCustodyAddress = "0xdC26577F40AC6eeBd2E5c2Fc7DB941b006Fbec07"; // Update this with your actual NFTCustody contract address
-    const NFTCustody = await ethers.getContractAt("NFTCustody", nftCustodyAddress);
-
-    console.log("NFTCustody contract fetched at address:", NFTCustody.address);
+    const nftCustodyAddress = "0x7a44AA14BD35aec7691A5b2cAAf83ab3dc1Fa195"; // Update this with your actual NFTCustody contract address
 
     try {
-        // Grant MINTER_ROLE with manual gas limit
+        const contractCode = await ethers.provider.getCode(nftCustodyAddress);
+        if (contractCode === "0x") {
+            console.error("No contract deployed at the specified address.");
+            return;
+        }
+        console.log(`Contract code at address ${nftCustodyAddress}:`, contractCode);
+
+        const NFTCustody = await ethers.getContractAt("NFTCustody", nftCustodyAddress);
+        console.log("NFTCustody contract fetched at address:", nftCustodyAddress);
+
         const MINTER_ROLE = await NFTCustody.MINTER_ROLE();
         console.log("MINTER_ROLE:", MINTER_ROLE);
 
-        await NFTCustody.connect(deployer).grantRole(MINTER_ROLE, deployer.address, { gasLimit: 500000 });
+        const grantRoleTx1 = await NFTCustody.connect(deployer).grantRole(MINTER_ROLE, deployer.address, { gasLimit: 500000 });
+        await grantRoleTx1.wait();
         console.log("Granted MINTER_ROLE to deployer");
 
-        await NFTCustody.connect(deployer).grantRole(MINTER_ROLE, user1.address, { gasLimit: 500000 });
+        const grantRoleTx2 = await NFTCustody.connect(deployer).grantRole(MINTER_ROLE, user1.address, { gasLimit: 500000 });
+        await grantRoleTx2.wait();
         console.log("Granted MINTER_ROLE to user1");
 
-        // Ensure the NFT is approved for transfer by the contract
         const nftContract = await ethers.getContractAt("IERC721", nftCustodyAddress);
-        await nftContract.connect(user1).approve(NFTCustody.address, 1, { gasLimit: 500000 });
+        const approveTx = await nftContract.connect(user1).approve(NFTCustody.address, 1, { gasLimit: 500000 });
+        await approveTx.wait();
         console.log("NFT approved for transfer");
 
-        // Deposit NFT and set metadata with manual gas limit
-        await NFTCustody.connect(user1).depositNFT("user1", 1, nftCustodyAddress, "Forward", "Example Team", 100, "https://example.com/1.png", { gasLimit: 500000 });
+        const depositTx = await NFTCustody.connect(user1).depositNFT("user1", 1, nftCustodyAddress, "Forward", "Example Team", 100, "https://example.com/1.png", { gasLimit: 500000 });
+        await depositTx.wait();
         console.log("NFT deposited");
 
-        await NFTCustody.connect(user1).claimNFT("user1", user1.address, { gasLimit: 500000 });
+        const claimTx = await NFTCustody.connect(user1).claimNFT("user1", user1.address, { gasLimit: 500000 });
+        await claimTx.wait();
         console.log("NFT claimed");
 
         const tokenURI = await NFTCustody.tokenURI(1);
         console.log("Token URI: ", tokenURI);
 
-        // Decode base64
         const base64Data = tokenURI.split(",")[1];
         const jsonMetadata = Buffer.from(base64Data, 'base64').toString('utf8');
         console.log("Decoded JSON Metadata: ", jsonMetadata);
-    } catch (error) {
-        console.error("Error during interaction:", error);
+    } catch (error: any) {
+        console.error("Error during interaction:", error.reason || error.message);
     }
 }
 
 main().catch((error) => {
-    console.error("Error in main execution:", error);
+    console.error("Error in main execution:", error.reason || error.message);
     process.exit(1);
 });

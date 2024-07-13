@@ -9,8 +9,6 @@ import "@openzeppelin/contracts/utils/Base64.sol";
 
 /// @title NFT Custody Service Contract
 /// @dev This contract allows users to deposit NFTs into custody and later claim them.
-import "hardhat/console.sol";
-
 contract NFTCustody is ERC721, AccessControl {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
@@ -71,23 +69,8 @@ contract NFTCustody is ERC721, AccessControl {
 
         nftContract.transferFrom(msg.sender, address(this), tokenId);
 
-        console.log("Storing Metadata:");
-        console.log("User ID:", userId);
-        console.log("Token ID:", tokenId);
-        console.log("Position:", position);
-        console.log("Team:", team);
-        console.log("Score:", score);
-        console.log("Image URL:", imageURL);
-
         _ownedNFTs[userId].push(tokenId);
         _nftMetadata[tokenId] = NFTMetadata(nftContractAddress, position, team, score, imageURL);
-
-        // Verify metadata was stored correctly
-        console.log("Stored Metadata for Token ID:", tokenId);
-        console.log("Position:", _nftMetadata[tokenId].position);
-        console.log("Team:", _nftMetadata[tokenId].team);
-        console.log("Score:", _nftMetadata[tokenId].score);
-        console.log("Image URL:", _nftMetadata[tokenId].imageURL);
 
         emit NFTDeposited(userId, tokenId, nftContractAddress);
     }
@@ -123,12 +106,6 @@ contract NFTCustody is ERC721, AccessControl {
     /// @return The metadata URI of the token.
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         NFTMetadata memory metadata = _nftMetadata[tokenId];
-        
-        console.log("Retrieving Metadata for Token ID:", tokenId);
-        console.log("Position:", metadata.position);
-        console.log("Team:", metadata.team);
-        console.log("Score:", metadata.score);
-        console.log("Image URL:", metadata.imageURL);
 
         string memory json = Base64.encode(bytes(string(abi.encodePacked(
             '{"name": "NFT #', Strings.toString(tokenId), '",',
