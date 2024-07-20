@@ -3,12 +3,9 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
 
-contract rewardNFT is ERC721Enumerable, Ownable {
-    using Counters for Counters.Counter;
-    
-    Counters.Counter private _tokenIds;
+contract NotificationNFT is ERC721Enumerable, Ownable {
+    uint256 private _nextTokenId;
     
     uint256 public constant MAX_SUPPLY = 10000;
     uint256 public mintPrice = 0.05 ether;
@@ -19,19 +16,17 @@ contract rewardNFT is ERC721Enumerable, Ownable {
     event NFTMinted(address indexed minter, uint256 indexed tokenId, string tokenURI);
 
     constructor(string memory initialBaseURI, address initialOwner) 
-        ERC721("rewardNFT", "RFT") 
+        ERC721("NotificationNFT", "NNFT") 
         Ownable(initialOwner)
     {
         baseTokenURI = initialBaseURI;
     }
 
     function mintNFT(string memory _tokenURI) public payable returns (uint256) {
-        require(_tokenIds.current() < MAX_SUPPLY, "Max supply reached");
+        require(_nextTokenId < MAX_SUPPLY, "Max supply reached");
         require(msg.value >= mintPrice, "Insufficient payment");
 
-        _tokenIds.increment();
-        uint256 newTokenId = _tokenIds.current();
-
+        uint256 newTokenId = _nextTokenId++;
         _safeMint(msg.sender, newTokenId);
         _setTokenURI(newTokenId, _tokenURI);
 
@@ -41,12 +36,12 @@ contract rewardNFT is ERC721Enumerable, Ownable {
     }
 
     function _setTokenURI(uint256 tokenId, string memory _tokenURI) internal virtual {
-        require(_ownerOf(tokenId) != address(0), "ERC721Metadata: URI set of nonexistent token");
+        require(ownerOf(tokenId) != address(0), "ERC721Metadata: URI set of nonexistent token");
         _tokenURIs[tokenId] = _tokenURI;
     }
 
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
-        require(_ownerOf(tokenId) != address(0), "ERC721Metadata: URI query for nonexistent token");
+        require(ownerOf(tokenId) != address(0), "ERC721Metadata: URI query for nonexistent token");
 
         string memory _tokenURI = _tokenURIs[tokenId];
         string memory base = baseTokenURI;
