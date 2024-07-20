@@ -1,33 +1,24 @@
-//SPDX-License-Identifier: Unlicense
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-contract Artwork is ERC721 {
-    uint256 public tokenCounter;
-mapping (uint256 => string) private _tokenURIs;
-constructor(
-        string memory name,
-        string memory symbol
-) ERC721(name, symbol) {
-        tokenCounter = 0;
-}
-function mint(string memory _tokenURI) public {
-        _safeMint(msg.sender, tokenCounter);
-        _setTokenURI(tokenCounter, _tokenURI);
 
-        tokenCounter++;
-}
-function _setTokenURI(uint256 _tokenId, string memory _tokenURI) internal virtual {
-        require(
-            _exists(_tokenId),
-            "ERC721Metadata: URI set of nonexistent token"
-        );  // Checks if the tokenId exists
-        _tokenURIs[_tokenId] = _tokenURI;
-}
-function tokenURI(uint256 _tokenId) public view virtual override returns(string memory) {
-        require(
-      _exists(_tokenId),
-            "ERC721Metadata: URI set of nonexistent token"
-        );
-        return _tokenURIs[_tokenId];
-}
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract NotificationNFT is ERC721URIStorage, Ownable {
+    uint256 private _tokenIds;
+
+    constructor() ERC721("NotificationNFT", "NFT") {}
+
+    function mintNFT(address recipient, string memory tokenURI)
+        public onlyOwner
+        returns (uint256)
+    {
+        _tokenIds++;
+        uint256 newItemId = _tokenIds;
+
+        _mint(recipient, newItemId);
+        _setTokenURI(newItemId, tokenURI);
+
+        return newItemId;
+    }
 }
